@@ -12,7 +12,7 @@ the index and the format reference; the labs themselves are not here.
 | [`week-03-lab/`](../../week-03-lab/) | week 2 — boot | `week-02/solution/` | new |
 | [`week-04-lab/`](../../week-04-lab/) | week 3 — interrupts and IO | `week-03/solution/` (no `starter/`) | new |
 | [`week-05-lab/`](../../week-05-lab/) | week 4 — memory | `week-04/solution/` (with `starter/`) | new |
-| [`week-06-lab/`](../../week-06-lab/) | week 5 — scheduling, part 1 | `week-05/` | moved only |
+| [`week-06-lab/`](../../week-06-lab/) | week 5 — scheduling, part 1 | `week-05/solution/` (with `starter/`) | new |
 | [`week-07-lab/`](../../week-07-lab/) | week 6 — scheduling, part 2 | `week-05/` | moved only |
 | [`week-08-lab/`](../../week-08-lab/) | week 7 — synchronization | `week-07/` | moved only |
 
