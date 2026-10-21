@@ -38,6 +38,7 @@ Requires the toolchain — see
 | `week-05/base/` and `week-05/solution/` | Preemptive round-robin scheduler: SysTick counts the time slice (`QUANTUM`), the context switch runs in PendSV, an idle task, `yield` / `delay` / `delay_until` system calls; scheduler trace dump (`trace_dump`: switch log plus Gantt chart, readable by the `schedsim trace` tool); demos `make run DEMO=coop\|idle`, `make run QUANTUM=2` |
 | *(none)* | Week 6 is theory-only (EDF/aperiodic/mixed/predictability) — `week-05/solution/` stays current |
 | `week-07/` | Spinlock (`ldrex`/`strex`), fixing a real UART race observed in week 5 |
+| [`project-base/`](project-base/) | Loader-project starting code with supplied task-lifecycle and recoverable-fault scaffolding, but no loader or shell solution |
 
 **About the weekly folders:** a revised `week-NN/` folder holds two
 folders, `base/` and `solution/`, rather than code directly. `base/` is the
