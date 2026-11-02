@@ -2,3 +2,4 @@ CLAUDE.md
 context/
 build/
 .vscode/
+local-tests/
