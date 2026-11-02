@@ -154,17 +154,21 @@ $(BUILD_DIR)/programs/obj/%.o: $(PROGRAM_DIR)/%.c
 $(BUILD_DIR)/programs/%.elf: $(BUILD_DIR)/programs/obj/%.o $(PROGRAM_RUNTIME_OBJS) $(PROGRAM_LD)
 	$(CC) $(PROGRAM_CFLAGS) $(PROGRAM_LDFLAGS) $< $(PROGRAM_RUNTIME_OBJS) -o $@
 
-# Build every loadable program's ELF (R1). Once tools/mkimage.py exists
-# (R2), `image` will pack these instead of the untouched-base placeholder.
+# Build every loadable program's ELF (R1), packed into a real IMG1 by
+# `image` below (R2).
 programs: $(PROGRAM_ELFS)
 
-# The host tool is student work. Once it exists, this target rebuilds the
-# image from every program in programs/. The separate $(IMAGE) rule above
-# remains the bootable placeholder used by an untouched project base.
-image: $(BIN)
+# Pack every built program into a real IMG1 image (R2), using the exact
+# host-tool contract from assignment.md 6.3 (big version): one `image`
+# command, explicit NAME=PROGRAM.elf arguments, ELFs copied unchanged.
+# NAME is each ELF's own basename, e.g. build/programs/print_plain.elf
+# becomes print_plain=build/programs/print_plain.elf. This replaces the
+# $(IMAGE) placeholder rule above, which `run`/`debug` still fall back to
+# when `image` has never been run (an untouched base has no programs yet).
+image: $(BIN) $(PROGRAM_ELFS)
 	@test -f $(IMAGE_TOOL) || { printf '%s\n' 'make image: implement tools/mkimage.py first'; exit 2; }
-	@test -d $(PROGRAM_DIR) || { printf '%s\n' 'make image: programs/ is missing'; exit 2; }
-	python3 $(IMAGE_TOOL) --output $(IMAGE) $(PROGRAM_DIR)
+	@mkdir -p $(dir $(IMAGE))
+	python3 $(IMAGE_TOOL) image $(IMAGE) $(foreach e,$(PROGRAM_ELFS),$(basename $(notdir $(e)))=$(e))
 
 # Build, load the image at its fixed FLASH address, then run in QEMU.
 run: $(BIN) $(IMAGE)
