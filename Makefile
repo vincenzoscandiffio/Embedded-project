@@ -78,7 +78,7 @@ QEMU := qemu-system-arm -machine mps2-an385 -monitor null -nographic -serial std
 QEMU += -device loader,file=$(IMAGE),addr=$(IMAGE_ADDR),force-raw=on
 
 # These targets are command names, not files on disk.
-.PHONY: all clean image run debug run-trace test
+.PHONY: all clean image run debug run-trace test programs
 
 # Default goal: build the image.
 all: $(BIN)
@@ -105,6 +105,58 @@ $(BIN): $(OBJECTS) scripts/mps2_m3.ld
 $(IMAGE):
 	@mkdir -p $(dir $@)
 	@printf 'SCRATCH-OS-PROJECT-IMAGE\n' > $@
+
+# --- Loadable programs (R1) ------------------------------------------
+# Each programs/*.c (other than start.c, its entry point) becomes its
+# own freestanding ELF, linked at address 0 by programs/programs.ld,
+# sharing no compiled code with the kernel image above: assignment.md
+# R1 requires every program to carry its own startup code, syscall
+# stubs and printf, built separately. --emit-relocs keeps the
+# relocation records the loader (R6) will need at load time.
+PROGRAM_LD := $(PROGRAM_DIR)/programs.ld
+PROGRAM_CFLAGS := -mthumb -mcpu=cortex-m3 -nostartfiles -ffreestanding -std=gnu17
+PROGRAM_CFLAGS += -Iinclude -I. -fno-builtin -Wall -Wextra -O0 -g3
+PROGRAM_LDFLAGS := -T $(PROGRAM_LD) -Wl,--emit-relocs -nostdlib -lgcc
+
+# Runtime files every program links in, compiled once and reused.
+PROGRAM_RUNTIME_OBJS := $(BUILD_DIR)/programs/runtime/start.o \
+                         $(BUILD_DIR)/programs/runtime/syscalls.o \
+                         $(BUILD_DIR)/programs/runtime/printf.o \
+                         $(BUILD_DIR)/programs/runtime/format.o
+
+$(BUILD_DIR)/programs/runtime/start.o: $(PROGRAM_DIR)/start.c
+	@mkdir -p $(dir $@)
+	$(CC) $(PROGRAM_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/programs/runtime/syscalls.o: lib/syscalls.s
+	@mkdir -p $(dir $@)
+	$(CC) $(PROGRAM_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/programs/runtime/printf.o: lib/printf.c
+	@mkdir -p $(dir $@)
+	$(CC) $(PROGRAM_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/programs/runtime/format.o: lib/format.c
+	@mkdir -p $(dir $@)
+	$(CC) $(PROGRAM_CFLAGS) -c $< -o $@
+
+# Every programs/<name>.c (the program's own main()) compiles into its
+# own object, in its own tree so it never collides with the kernel's
+# build/lib/*.o built from the same sources with different flags.
+PROGRAM_SOURCES := $(filter-out $(PROGRAM_DIR)/start.c,$(wildcard $(PROGRAM_DIR)/*.c))
+PROGRAM_ELFS := $(patsubst $(PROGRAM_DIR)/%.c,$(BUILD_DIR)/programs/%.elf,$(PROGRAM_SOURCES))
+
+.PRECIOUS: $(BUILD_DIR)/programs/obj/%.o
+$(BUILD_DIR)/programs/obj/%.o: $(PROGRAM_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(PROGRAM_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/programs/%.elf: $(BUILD_DIR)/programs/obj/%.o $(PROGRAM_RUNTIME_OBJS) $(PROGRAM_LD)
+	$(CC) $(PROGRAM_CFLAGS) $(PROGRAM_LDFLAGS) $< $(PROGRAM_RUNTIME_OBJS) -o $@
+
+# Build every loadable program's ELF (R1). Once tools/mkimage.py exists
+# (R2), `image` will pack these instead of the untouched-base placeholder.
+programs: $(PROGRAM_ELFS)
 
 # The host tool is student work. Once it exists, this target rebuilds the
 # image from every program in programs/. The separate $(IMAGE) rule above
