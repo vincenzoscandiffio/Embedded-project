@@ -24,4 +24,13 @@ SECTIONS
         *(.bss*)
         *(COMMON)
     } > PROG_RAM
+
+    /DISCARD/ :
+    {
+        *(.ARM.exidx*)
+        *(.ARM.extab*)
+        *(.eh_frame*)
+        *(.comment)
+        *(.note*)
+    }
 }
