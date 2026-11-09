@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include <string.h>
 
 #include "kernel/task.h"
 #include "lib/syscalls.h"
@@ -13,20 +12,47 @@ extern uint32_t _shell_data_end;
 extern uint32_t _shell_data_load;
 
 #define LINE_SIZE 32
-#define NAME_SIZE 32
+#define NAME_SIZE 16 //sys_image_name accepts a capacity of 1..16 only (6.5)
 
 static char line[LINE_SIZE]; //requirement ask to accept max 31 characters
 static char program_name[NAME_SIZE]; //buffer to store the program name
 static void shell_task(void);
 
-static int skip_lf = 0; 
+/* There is no C library (-nostdlib), so the few string helpers the shell
+ * needs are written here. */
+static unsigned str_len(const char *s){
+    unsigned n = 0;
+    while (s[n] != '\0'){
+        n++;
+    }
+    return n;
+}
+
+static int str_eq(const char *a, const char *b){
+    while (*a != '\0' && *a == *b){
+        a++;
+        b++;
+    }
+    return *a == *b;
+}
+
+static int str_starts_with(const char *s, const char *prefix){
+    while (*prefix != '\0'){
+        if (*s != *prefix){
+            return 0;
+        }
+        s++;
+        prefix++;
+    }
+    return 1;
+}
 
 void task_project_configure(void){ //called automatically by kernel before the first task
     task_configure_shell("shell", shell_task, &_shell_stack_top, (uint32_t)&_shell_part_start, (uint32_t)&_shell_part_end, &_shell_data_start, &_shell_data_end, &_shell_data_load);
 }
 
 static void shell_write(const char *text){
-    unsigned remaining = strlen(text);
+    unsigned remaining = str_len(text);
 
     while(remaining > 0){
         int written = sys_write(text, remaining);
@@ -48,22 +74,9 @@ static void shell_read_line(void){
             continue;
         }
 
-        if (skip_lf){
-            skip_lf = 0; 
-
-            if (c == '\n'){
-                continue;
-            }
-        }
-
-        if (c == '\r' || c == '\n'){ //end of line detected
-            shell_write("\n"); 
-
-            if (c=='\r'){
-                skip_lf = 1; 
-            }
-
-            break; 
+        if (c == '\r' || c == '\n'){ //a CR or an LF prints one newline and ends the line (6.6)
+            shell_write("\n");
+            break;
         }
 
         if (length < LINE_SIZE -1){
@@ -83,7 +96,7 @@ static void shell_list_programs(void){ // function called if ls command is enter
     int count = sys_image_count();  //get the number of programs in the system
 
     if (count < 0){
-        shell_write ("error: unable to list programs\n");
+        shell_write ("error: no valid image\n");
         return;
     }
 
@@ -102,10 +115,12 @@ static void shell_run_program(const char *name){
 
     if (task_id == -2){
         shell_write ("error: program not found\n");
+        return;
     } else if (task_id == -3){
         shell_write ("error: no free slot\n");
-    }else if (task_id < 0){
-        shell_write ("error: unable to run program\n");
+        return;
+    } else if (task_id < 0){
+        shell_write ("error: program cannot be loaded\n");
         return;
     }
 
@@ -119,13 +134,13 @@ static void shell_task(void){
         shell_write("scratch> ");  //prints the prompt before any command
         shell_read_line(); // waits for input
 
-        if (strcmp(line, "help") == 0){
+        if (str_eq(line, "help")){
             shell_write ("help - show commands\n"); 
             shell_write("ls - list programs\n"); 
             shell_write("run <name> - run a program\n"); 
-        } else if (strcmp(line, "ls") == 0){
+        } else if (str_eq(line, "ls")){
             shell_list_programs();
-        } else if (strncmp(line, "run ", 4) == 0 && line[4] != '\0'){ //checks if the command starts with "run " and has a program name after it
+        } else if (str_starts_with(line, "run ") && line[4] != '\0'){ //checks if the command starts with "run " and has a program name after it
             shell_run_program(line + 4); //run the program with the name after "run "
         } else {
             shell_write ("error: unknown command\n");
